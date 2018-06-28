@@ -11,8 +11,12 @@
 // Enable only when GPIO16 is connected to RST
 #define USE_ESP8266_DEEPSLEEP 0
 
+#ifndef CONFIG_WIFI_SSID
 #define CONFIG_WIFI_SSID "ssid"
+#endif
+#ifndef CONFIG_WIFI_PASS
 #define CONFIG_WIFI_PASS "password"
+#endif
 
 // Each tick is 500ms
 #define WIFI_CONNECTION_WAIT_THRESOLD_TICKS 40

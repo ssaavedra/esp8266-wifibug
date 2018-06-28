@@ -1,3 +1,5 @@
+// Original was https://github.com/DaKaZ/esp8266-restclient/
+// Original license: MIT
 #ifndef RestClient_h
 #define RestClient_h
 

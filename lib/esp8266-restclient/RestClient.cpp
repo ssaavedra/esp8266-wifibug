@@ -1,3 +1,5 @@
+// Original was https://github.com/DaKaZ/esp8266-restclient/
+// Original license: MIT
 #include "RestClient.h"
 
 #ifdef HTTP_DEBUG
