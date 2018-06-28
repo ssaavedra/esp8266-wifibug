@@ -1,19 +1,19 @@
-# Trying SSL with bottle
-# ie combo of http://www.piware.de/2011/01/creating-an-https-server-in-python/
-# and http://dgtool.blogspot.com/2011/12/ssl-encryption-in-python-bottle.html
-# without cherrypy?
-# requires ssl
+#!/usr/bin/env python3
 
-# to create a server certificate, run eg
+# The idea of using Bottle with SSL originally taken from http://www.socouldanyone.com/2014/01/bottle-with-ssl.html
+# which in turn relies on http://www.piware.de/2011/01/creating-an-https-server-in-python/
+# and http://dgtool.blogspot.com/2011/12/ssl-encryption-in-python-bottle.html
+
+# to create a self-signed server certificate (with the private key attached to the same file) run:
+#
 # openssl req -new -x509 -keyout server.pem -out server.pem -days 365 -nodes
-# DON'T distribute this combined private/public key to clients!
-# (see http://www.piware.de/2011/01/creating-an-https-server-in-python/#comment-11380)
+
 import os
 
 from datetime import datetime
 import json
 
-from bottle import Bottle, get, request, response, run, ServerAdapter
+from bottle import Bottle, request, response, ServerAdapter
 from bottle.ext import sqlalchemy
 from sqlalchemy import create_engine, Column, DateTime, Integer, Sequence, String
 from sqlalchemy.ext.declarative import declarative_base
@@ -146,9 +146,6 @@ def post_data(mac, db):
     response.set_header('Content-Type', 'text/plain')
     return 'CONN OK'
 
-#instead of:
-#run(host="0.0.0.0", port=8090)
-#we use:
 
 if __name__ == '__main__':
     if os.environ.get('SSL', None) in set(['TRUE', 'true', '1']):
