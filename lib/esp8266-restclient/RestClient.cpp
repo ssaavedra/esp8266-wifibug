@@ -267,6 +267,7 @@ int RestClient::request(const char* method, const char* path,
     }
     request += "Host: " + String(host) +  ":" + String(port) + "\r\n";
     request += "Connection: close\r\n";
+    request += "Content-Type: " + String(contentType) + "\r\n";
 
     write(request.c_str());
     cb([&](const char *p) { write(p); });
