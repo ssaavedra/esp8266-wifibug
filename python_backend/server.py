@@ -10,13 +10,16 @@
 
 import os
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 from bottle import Bottle, request, response, ServerAdapter
 from bottle.ext import sqlalchemy
 from sqlalchemy import create_engine, Column, DateTime, Integer, Sequence, String
 from sqlalchemy.ext.declarative import declarative_base
+
+def is_ssl_server():
+    return os.environ.get('SSL', None) in set(['TRUE', 'true', '1'])
 
 Base = declarative_base()
 engine = create_engine(os.environ.get('DATABASE_URL', 'sqlite:///sqlite.db'), echo=True)
@@ -33,6 +36,29 @@ plugin = sqlalchemy.Plugin(
 
 app.install(plugin)
 
+class LastSeenDevice(Base):
+    __tablename__ = 'last_seen'
+    device = Column(String(32), primary_key=True)
+    timestamp = Column(DateTime(timezone=False))
+
+    def __init__(self, device, timestamp):
+        self.device = device
+        self.timestamp = timestamp
+
+    def __repr__(self):
+        return '<LastSeen {dev} @ {t}>'.format(
+            dev=self.device,
+            t=self.timestamp,
+        )
+
+    def to_json(self):
+        return {
+            'device': self.device,
+            'ts': int(self.timestamp.timestamp()),
+            'datetime': self.timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'),
+        }
+
+
 class Measure(Base):
     __tablename__ = 'measures'
     id = Column(Integer, Sequence('id_seq'), primary_key=True)
@@ -41,6 +67,7 @@ class Measure(Base):
     bssid = Column(String(32))
     ssid = Column(String(64))
     rssi = Column(Integer())
+    saved_at = Column(DateTime(timezone=False))
 
     def __init__(self, **kwargs):
         self.device = kwargs['device']
@@ -48,6 +75,7 @@ class Measure(Base):
         self.bssid = kwargs['bssid']
         self.ssid = kwargs['ssid']
         self.rssi = kwargs['rssi']
+        self.saved_at = kwargs['saved_at']
 
     def __repr__(self):
         return "<Measure [{dev} @ {ts} for {bssid}] {r} dBm>".format(
@@ -93,7 +121,31 @@ def ping():
 
 def get_url(relative_url):
     (scheme, host, _, _, _) = request.urlparts
+    if is_ssl_server():
+        scheme = 'https'
     return scheme + '://' + host + relative_url
+
+
+@app.get('/lastseen')
+def list_last_seen_devices(db):
+    devices = db.query(LastSeenDevice) \
+                .order_by(LastSeenDevice.timestamp.desc())[:10]
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('X-HATEOAS', '1')
+    return json.dumps([ d.to_json() for d in devices ])
+    
+
+@app.get('/missing')
+@app.get('/missing/')
+@app.get('/missing/<seconds:int>')
+def list_last_seen_devices(db, seconds=120):
+    devices = db.query(LastSeenDevice) \
+                .filter(LastSeenDevice.timestamp <= datetime.now() - timedelta(0, seconds)) \
+                .order_by(LastSeenDevice.timestamp.desc())
+    response.set_header('Content-Type', 'application/json')
+    response.set_header('X-HATEOAS', '1')
+    return json.dumps([ d.to_json() for d in devices ])
+    
 
 @app.get('/data/<mac>')
 def get_measures_for_mac(mac, db):
@@ -119,7 +171,6 @@ def get_measures_for_mac(mac, db):
 @app.get('/data')
 def get_macs(db):
     from sqlalchemy.sql import select
-    print("Measures shas {}".format(dir(Measure)))
     devices = db.execute(select([Measure.__table__.c.device]).distinct()).fetchall()
     response.set_header('Content-Type', 'application/json')
 
@@ -135,20 +186,22 @@ def get_macs(db):
 @app.post("/data/<mac>")
 def post_data(mac, db):
     print("Retrieved measures for MAC: {}".format(mac))
-    print("Request: {}".format(request))
-    print("Values: {}".format(request.json))
+    request_time = datetime.now()
     if request.json and len(request.json) > 0:
+        print("Values: {}".format(sorted(request.json, key=lambda x: x['rssi'], reverse=True)))
         for v in request.json:
             v['device'] = mac
+            v['saved_at'] = request_time
             db.add(Measure(**v))
     else:
         print("Values were missing")
+    db.merge(LastSeenDevice(mac, request_time))
     response.set_header('Content-Type', 'text/plain')
     return 'CONN OK'
 
 
 if __name__ == '__main__':
-    if os.environ.get('SSL', None) in set(['TRUE', 'true', '1']):
+    if is_ssl_server():
         srv = SSLWSGIRefServer(host="0.0.0.0", port=4443)
         app.run(server=srv, reloader=True)
     else:
