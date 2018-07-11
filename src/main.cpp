@@ -3,26 +3,12 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 #include <RestClient.h>
+#include "config.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a < b) ? a : b)
 #endif
 
-// Enable only when GPIO16 is connected to RST
-#define USE_ESP8266_DEEPSLEEP 0
-
-#ifndef CONFIG_WIFI_SSID
-#define CONFIG_WIFI_SSID "ssid"
-#endif
-#ifndef CONFIG_WIFI_PASS
-#define CONFIG_WIFI_PASS "password"
-#endif
-
-// Each tick is 500ms
-#define WIFI_CONNECTION_WAIT_THRESOLD_TICKS 40
-
-#define MAX_FOUND_NETWORKS 512
-#define SSID_RECORD 32
 
 #include <WifiRecordList.h>
 
@@ -52,7 +38,8 @@ void setup_time() {
     // Synchronize time useing SNTP. This is necessary to verify that
     // the TLS certificates offered by the server are currently valid.
     Serial.print(F("Setting time using SNTP"));
-    configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    // UTC, please
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     time_t now = time(nullptr);
     while (now < 8 * 3600 * 2) {
       delay(500);
@@ -107,11 +94,17 @@ void record_wifis() {
   wifi_records.record_current_wifis(true);
 }
 
-RestClient client = RestClient("archpi", 4443);
-
+/*
+#ifndef CONFIG_UPLOAD_SERVER_SSL_FINGERPRINT
+RestClient client = RestClient(CONFIG_UPLOAD_SERVER_HOST, CONFIG_UPLOAD_SERVER_PORT, CONFIG_UPLOAD_SERVER_SSL);
+#else
+RestClient client = RestClient(CONFIG_UPLOAD_SERVER_HOST, CONFIG_UPLOAD_SERVER_PORT, (char*)CONFIG_UPLOAD_SERVER_SSL_FINGERPRINT);
+#endif
+*/
 
 
 void setup() {
+  RestClient client = RestClient(CONFIG_UPLOAD_SERVER_HOST, CONFIG_UPLOAD_SERVER_PORT, (int) CONFIG_UPLOAD_SERVER_SSL);
   Serial.begin(115200);
   Serial.println();
   Serial.print(F("My MAC address is "));
@@ -129,52 +122,53 @@ void setup() {
   strcpy_P(server_url_path, PSTR("/data/"));
   strcat(server_url_path, WiFi.macAddress().c_str());
 
-  client.setSSL(1);
   client.setContentType("application/json");
   client.setHeader(mac_header);
 
-  while(1) {
-    response = "";
-    record_wifis();
 
-    int statusCode = client.request(
-      "POST", server_url_path,
-      [&](std::function<void(const char*)> printer) {
-        String len = String(wifi_records.json_length());
-        printer("Content-Length: ");
-        printer(len.c_str());
-        printer("\r\n\r\n");
-        wifi_records.json_output_all(printer);
-        printer("\r\n\r\n");
-      },
-      &response
-    );
+  response = "";
+  Serial.println("Begin loop");
+  record_wifis();
+  Serial.println("Wifi networks recorded");
+  print_known_wifis();
 
-    if(statusCode == 200) {
-      wifi_records.reset();
-      Serial.print(F("Status code from server: "));
-      Serial.println(statusCode);
-      Serial.print(F("Response body from server: "));
-      Serial.println(response);
+  int statusCode = client.request(
+    "POST", server_url_path,
+    [](std::function<void(const char*)> printer) {
+      String len = String(wifi_records.json_length());
+      printer("Content-Length: ");
+      printer(len.c_str());
+      printer("\r\n\r\n");
+      wifi_records.json_output_all(printer);
+      printer("\r\n");
+    },
+    &response
+  );
 
-      // Avoid wifi disconnection when not deep-sleeping
-      #if USE_ESP8266_DEEPSLEEP
-        WiFi.disconnect(true);
-        Serial.println(F("Deep-Sleeping"));
-      #else
-        Serial.println(F("Sleeping"));
-      #endif
-      sleep();
-    } else if(statusCode <= 100) {
-      // Could not connect to the server!
-      Serial.println(F("Could not connect to the server. Light-sleeping and retrying."));
-      delay(1000);
-    }
-    #if !USE_ESP8266_DEEPSLEEP
-      if(WiFi.status() != WL_CONNECTED && !wifi_connect(ssid, wifi_password)) {return;}
+  if(statusCode == 200) {
+    wifi_records.reset();
+    Serial.print(F("Status code from server: "));
+    Serial.println(statusCode);
+    Serial.print(F("Response body from server: "));
+    Serial.println(response);
+
+    // Avoid wifi disconnection when not deep-sleeping
+    #if USE_ESP8266_DEEPSLEEP
+      WiFi.disconnect(true);
+      Serial.println(F("Deep-Sleeping"));
+    #else
+      Serial.println(F("Sleeping"));
     #endif
+    sleep();
+  } else if(statusCode <= 100) {
+    // Could not connect to the server!
+    Serial.println(F("Could not connect to the server. Light-sleeping and retrying."));
+    delay(1000);
   }
+  #if !USE_ESP8266_DEEPSLEEP
+    if(WiFi.status() != WL_CONNECTED && !wifi_connect(ssid, wifi_password)) {return;}
+  #endif
 }
 
 // For the case where deepSleep is not used
-void loop() { setup(); }
+void loop() { setup(); delay(1000); }
