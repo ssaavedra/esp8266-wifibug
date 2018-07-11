@@ -30,7 +30,7 @@
 #endif
 
 #ifndef MAX_FOUND_NETWORKS
-#define MAX_FOUND_NETWORKS 512
+#define MAX_FOUND_NETWORKS 64
 #endif
 
 #ifndef SSID_RECORD

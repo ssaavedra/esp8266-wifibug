@@ -70,13 +70,15 @@ found_networks, max_records, next_record);
 
 void WifiRecordList::print_all() {
   struct tm timeinfo;
+  char timebuffer[50];
   Serial.print(("WiFi networks found: "));
   Serial.println(next_record);
   for(int i = 0; i < next_record; i++) {
     Serial.printf("-- WIFI #%02i\n", i);
     Serial.print("Timestamp: ");
     gmtime_r(&recorded_strengths[i].timestamp, &timeinfo);
-    Serial.print(asctime(&timeinfo));
+    Serial.print(".. ");
+    Serial.print(asctime_r(&timeinfo, timebuffer));
     Serial.print("BSSID: ");
     Serial.printf(
       "%02x:%02x:%02x:%02x:%02x:%02x\n",

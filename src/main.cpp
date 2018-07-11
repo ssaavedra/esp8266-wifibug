@@ -17,8 +17,8 @@ static const char wifi_password[] PROGMEM = CONFIG_WIFI_PASS;
 
 long global_iteration = 0;
 char mac_header[32];
+char global_buffer[500];
 String response;
-String body;
 struct wifi_strength _wifi_records_buffer[MAX_FOUND_NETWORKS];
 WifiRecordList wifi_records = WifiRecordList(_wifi_records_buffer, MAX_FOUND_NETWORKS);
 
@@ -50,7 +50,7 @@ void setup_time() {
     struct tm timeinfo;
     gmtime_r(&now, &timeinfo);
     Serial.print(F("Current time: "));
-    Serial.print(asctime(&timeinfo));
+    Serial.print(asctime_r(&timeinfo, global_buffer));
 }
 
 bool wifi_connect(const char *ssid, const char *password) {
@@ -85,7 +85,8 @@ bool wifi_connect(const char *ssid, const char *password) {
 
 void print_known_wifis() {
   // wifi_records.print_all();
-  wifi_records.json_output_all([&](const char *p) {
+
+  wifi_records.json_output_all([](const char *p) {
     Serial.print(p);
   });
 }
@@ -111,6 +112,8 @@ void setup() {
   Serial.println(WiFi.macAddress());
   Serial.print(F("connecting to "));
   Serial.println(FPSTR(ssid));
+  Serial.print("Using SSL: ");
+  Serial.println(CONFIG_UPLOAD_SERVER_SSL);
 
   if(!wifi_connect(ssid, wifi_password)) {return;}
   setup_time();
@@ -135,9 +138,10 @@ void setup() {
   int statusCode = client.request(
     "POST", server_url_path,
     [](std::function<void(const char*)> printer) {
-      String len = String(wifi_records.json_length());
+      String *len = new String(wifi_records.json_length());
       printer("Content-Length: ");
-      printer(len.c_str());
+      printer(len->c_str());
+      delete len;
       printer("\r\n\r\n");
       wifi_records.json_output_all(printer);
       printer("\r\n");
