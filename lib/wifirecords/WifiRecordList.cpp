@@ -19,20 +19,11 @@
 #define WRL_DEBUG_PRINTF(string, ...)
 #endif
 
-WifiRecordList::WifiRecordList(size_t _max_records): max_records(_max_records) {
-  next_record = 0;
-  recorded_strengths = new wifi_strength_t[_max_records];
-}
-
 WifiRecordList::WifiRecordList(struct wifi_strength *buffer, size_t _max_records) {
   next_record = 0;
   recorded_strengths = buffer;
   max_records = _max_records;
 }
-
-
-WifiRecordList::WifiRecordList(): next_record(0), max_records(0) {}
-
 
 void WifiRecordList::reset() {
   next_record = 0;
@@ -69,14 +60,14 @@ found_networks, max_records, next_record);
 
 
 void WifiRecordList::print_all() {
-  struct tm timeinfo;
+  struct tm *timeinfo;
   Serial.print(("WiFi networks found: "));
   Serial.println(next_record);
   for(int i = 0; i < next_record; i++) {
     Serial.printf("-- WIFI #%02i\n", i);
     Serial.print("Timestamp: ");
-    gmtime_r(&recorded_strengths[i].timestamp, &timeinfo);
-    Serial.print(asctime(&timeinfo));
+    timeinfo = gmtime(&recorded_strengths[i].timestamp);
+    Serial.print(asctime(timeinfo));
     Serial.print("BSSID: ");
     Serial.printf(
       "%02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -92,6 +83,7 @@ void WifiRecordList::print_all() {
     Serial.printf("\n\n");
   }
 }
+
 
 static const char *bssid_to_str(const uint8_t *bssid) {
   static char buffer[24];
@@ -112,19 +104,35 @@ void record_to_json(std::function<void(const char *)> printer, struct wifi_stren
   printer(buffer);
 }
 
-void WifiRecordList::json_output_all(std::function<void(const char *)> printer) {
-  printer("[");
+void record_to_json(char *dest, struct wifi_strength record) {
+  sprintf(
+    dest,
+    ("{\"ts\": %ld, \"bssid\": \"%s\", \"ssid\": \"%s\", \"rssi\": %d}"),
+    record.timestamp,
+    bssid_to_str(record.bssid),
+    record.ssid,
+    record.rssi
+  );
+}
+
+void WifiRecordList::json_output_all(char *dest) {
+  strcat(dest, "[");
   for(int i = 0; i < next_record; i++) {
-    record_to_json(printer, recorded_strengths[i]);
-    if(i + 1 < next_record) { printer(",\n"); };
+    record_to_json(dest, recorded_strengths[i]);
+    if(i + 1 < next_record) { strcat(dest, ",\n"); };
   }
-  printer("]\n");
+  strcat(dest, "]\n");
 }
 
 unsigned long WifiRecordList::json_length() {
-  size_t length = 0;
-  json_output_all([&](const char *s) {
-    length += strlen(s);
-  });
+  size_t length = 3;
+  char buffer[100];
+  buffer[0] = '\0';
+
+  for(int i = 0; i < next_record; i++) {
+    record_to_json(buffer, recorded_strengths[i]);
+    length += strlen(buffer);
+    if(i + 1 < next_record) { i++; };
+  }
   return length;
 }

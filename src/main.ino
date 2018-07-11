@@ -84,10 +84,17 @@ bool wifi_connect(const char *ssid, const char *password) {
 
 
 void print_known_wifis() {
-  // wifi_records.print_all();
-  wifi_records.json_output_all([&](const char *p) {
-    Serial.print(p);
-  });
+  wifi_records.print_all();
+
+  int json_length = wifi_records.json_length();
+  Serial.printf("We need %d additional bytes\n", json_length);
+  char *json_body = (char *) malloc(json_length);
+  sprintf(json_body, "Content-Length: %d\r\n\r\n", json_length);
+  wifi_records.json_output_all(json_body);
+  strcat(json_body, "\r\n");
+
+  Serial.print(json_body);
+  free(json_body);
 }
 
 void record_wifis() {
@@ -132,18 +139,14 @@ void setup() {
   Serial.println("Wifi networks recorded");
   print_known_wifis();
 
-  int statusCode = client.request(
-    "POST", server_url_path,
-    [](std::function<void(const char*)> printer) {
-      String len = String(wifi_records.json_length());
-      printer("Content-Length: ");
-      printer(len.c_str());
-      printer("\r\n\r\n");
-      wifi_records.json_output_all(printer);
-      printer("\r\n");
-    },
-    &response
-  );
+  int json_length = wifi_records.json_length();
+  char *json_body = (char*) malloc(json_length);
+  sprintf(json_body, "Content-Length: %d\r\n\r\n", json_length);
+  wifi_records.json_output_all(json_body);
+  strcat(json_body, "\r\n");
+
+  int statusCode = client.request("POST", server_url_path, json_body, &response);
+  free(json_body);
 
   if(statusCode == 200) {
     wifi_records.reset();

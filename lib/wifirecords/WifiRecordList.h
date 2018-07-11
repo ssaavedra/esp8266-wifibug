@@ -21,10 +21,7 @@ typedef struct wifi_strength {
 class WifiRecordList {
 
 public:
-    WifiRecordList();
-    WifiRecordList(size_t _max_records);
     WifiRecordList(struct wifi_strength *buffer, size_t _max_records);
-
 
     void reset();
     size_t len();
@@ -32,7 +29,7 @@ public:
     // Returns the number of records appended
     int record_current_wifis(bool append = true);
     void print_all();
-    void json_output_all(std::function<void(const char *)> printer);
+    void json_output_all(char *dest);
     unsigned long json_length();
 
 private:
