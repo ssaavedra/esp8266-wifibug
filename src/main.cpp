@@ -5,6 +5,8 @@
 #include <RestClient.h>
 #include "config.h"
 
+#define SLEEP_TIME 60
+
 #ifndef MIN
 #define MIN(a, b) ((a < b) ? a : b)
 #endif
@@ -25,11 +27,11 @@ WifiRecordList wifi_records = WifiRecordList(_wifi_records_buffer, MAX_FOUND_NET
 char server_url_path[28];
 
 
-void sleep() {
+void sleep(int seconds) {
   #if USE_ESP8266_DEEPSLEEP
-  ESP.deepSleep(1e6);
+  ESP.deepSleep(seconds * 1e6);
   #else
-  delay(1000);
+  delay(seconds * 1e3);
   #endif
 }
 
@@ -66,7 +68,7 @@ bool wifi_connect(const char *ssid, const char *password) {
     if(wait_ticks++ > WIFI_CONNECTION_WAIT_THRESOLD_TICKS) {
       Serial.print(F("Connection data was not useful to connect. Current status is: "));
       Serial.println(WiFi.status());
-      sleep(); // NORETURN
+      sleep(SLEEP_TIME); // NORETURN
       return false;
     }
   }
@@ -115,7 +117,7 @@ void setup() {
   Serial.print("Using SSL: ");
   Serial.println(CONFIG_UPLOAD_SERVER_SSL);
 
-  if(!wifi_connect(ssid, wifi_password)) {return;}
+  if(!wifi_connect(ssid, wifi_password)) { sleep(SLEEP_TIME * 2); return;}
   setup_time();
   // WiFi.disconnect();
 
@@ -163,7 +165,7 @@ void setup() {
     #else
       Serial.println(F("Sleeping"));
     #endif
-    sleep();
+    sleep(SLEEP_TIME);
   } else if(statusCode <= 100) {
     // Could not connect to the server!
     Serial.println(F("Could not connect to the server. Light-sleeping and retrying."));

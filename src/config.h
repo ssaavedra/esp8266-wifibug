@@ -4,7 +4,7 @@
 
 // Enable only when GPIO16 is connected to RST
 #ifndef USE_ESP8266_DEEPSLEEP
-#define USE_ESP8266_DEEPSLEEP 0
+#define USE_ESP8266_DEEPSLEEP 1
 #endif
 
 #ifndef CONFIG_WIFI_SSID
