@@ -61,16 +61,49 @@ the serial port at 115200 baud/s.
 Use the output to open an issue (you should redact the information
 that may be personally identifiable, if any).
 
+Python Server
+=============
+
+We need a backend where to store the information from the ESP8266
+devices.
+
+We have put together a bottle.py simple applicaton that can hold in a
+SQLite database the measures taken by the ESP8266.
+
+It is available under the `python_backend` tree.
+
+
+Features
+--------
+
+- Capture data (`POST` at `/data/<device-mac-address>`)
+- Read captured data (`GET` at `/data/<device-mac-address>`)
+- List all known devices (`GET` at /`data`)
+- Retrieve the last known time of an update (`GET` at
+  `/missing/<last-seen-time-in-seconds>` in order to know, for
+  example, if a device is missing or out-of-battery)
+- Retrieve the latest 10 seen devices (`GET` at /lastseen)
+
+
+Usage
+-----
+
+Just make the server available at some URL that can be fetched from
+the WiFi connection configured at the Arduino project. It can be an IP
+or a DNS server that can be resolved via the default DHCP settings in
+the wifi network.
+
+
 
 Issues
-------
+======
 
 For the moment, we are using GitHub issues as the main point of
 contact.
 
 
 Contributing
-------------
+============
 
 Contributions to the project are very welcome. In order to keep the
 development of this project as free software, please take note of the
@@ -81,7 +114,7 @@ agree to provide your code under the same license of the project.
 
 
 License
--------
+=======
 
 This project is released under the GNU General Public License version
 3.0 published by the Free Software Foundation.
